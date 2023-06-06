@@ -1,15 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
-from selenium import webdriver
 
-from selenium import webdriver 
-from selenium.webdriver.chrome.service import Service as ChromeService 
-from webdriver_manager.chrome import ChromeDriverManager 
 
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
+import requests
 from bs4 import BeautifulSoup
 #requires 
 #pip3 install -U selenium
@@ -41,69 +34,58 @@ def get_selected_values(make_var, model_var, year_var, sort_var):
 
 
 def get_makes_and_models():
-    #set url
-    url = "https://www.carvana.com/cars"
-    
-    #set options
-    options = webdriver.ChromeOptions()
-    options.add_argument("--start-maximized")
-    options.add_argument("--headless=new")
-    
-    #create driver
-    driver = webdriver.Chrome(service=ChromeService(
-        ChromeDriverManager().install()), options=options) 
-
-    
-    driver.get(url)
-    
-    '''
-    wait = WebDriverWait(driver, 10)
-    models = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[data-qa="filters.expandfacet-make-model-headerButton"]')))
-    print(models.text)
-    # models.click()
-
-
-    wait = WebDriverWait(driver, 5)
-    show_more = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[data-qa="filters.toggle-all-makes-button"]')))
-    print(show_more.text)
-    # show_more.click()
-'''
-
-    
-
-    #get the html
-    page = driver.page_source
-    soup = BeautifulSoup(page, 'html.parser')
-    
-    
-
-    
-    results = soup.find(id="__next")
-    makes_and_models = results.find_all("div", class_= "grid gap-16 p-32")[0]
-    
-    result_dict = {}
-    current_key = None
-    current_values = []
-    
-    for makes_and_model in makes_and_models.find_all("input"):
-        id = makes_and_model.get("id")
-        
-        #get make as key
-        if id.startswith("make-"):
-            if current_key:
-                result_dict[current_key] = current_values
-                current_values = []
-            current_key = id.replace("make-", "")
-        #get model as value
-        elif id.startswith("model-") and current_key:
-            current_values.append(id.replace("model-", ""))
-
-    if current_key:
-        result_dict[current_key] = current_values
-    
     global car_dict
-    car_dict = result_dict
+   
+    car_makes_first_letter = "ABCDEFGHIJKLMNOPRSTV"
+    for page in car_makes_first_letter:
+        url = "https://www.kbb.com/car-make-model-list/used/"+page+"/make/"
+        data = requests.get(url)
     
+        
+        soup = BeautifulSoup(data.text, 'html.parser')
+        chart = soup.find(class_="css-1q107tk ee33uo30")
+        list_of_all = chart.find_all(class_="css-irk93x ee33uo33")
+        
+        each_row = [None, None]
+        for index, element in enumerate(list_of_all):
+            # Get the index within the group of three elements
+            group_index = index % 3
+            # make list of row for easier processing later
+            if group_index == 0:
+                each_row = [None, None]
+
+            if group_index == 0:
+                # Process the model element
+                model = element
+                #print("Model:", model.text)
+                each_row[1] = model.text
+            elif group_index == 1:
+                # Process the make element
+                make = element
+                #print("Make:", make.text)
+                each_row[0] = make.text
+            elif group_index == 2:
+                # Process the years element
+                years = element
+                #print("Years:", years.text)
+                each_row.append(years.text)
+            
+            # when list for row is complete, add to dictionary
+            if group_index == 2:
+                make = each_row[0]
+                model = each_row[1]
+                
+                if make not in car_dict:
+                    car_dict[make] = {}
+                
+                car_dict[make][model] = []
+                
+                for each_year in range(2, len(each_row)):
+                    year = each_row[each_year]
+                
+                    car_dict[make][model].append(year)
+                
+    print(car_dict)
     
     
     
@@ -113,6 +95,12 @@ def create_window():
     # Create the main window
     window = tk.Tk()
     window.title("Car Selector")
+    window.geometry('600x400')
+
+    # Scale up the font size
+    style = ttk.Style()
+    style.configure('TLabel', font=('Arial', 16))  # Adjust the font size for labels
+    style.configure('TCombobox', font=('Arial', 16))  # Adjust the font size for comboboxes
 
     # Set the margin around the window
     window.configure(padx=20, pady=20)
@@ -127,42 +115,62 @@ def create_window():
     make_label = ttk.Label(window, text="Make:")
     make_label.grid(row=0, column=0, sticky=tk.W, padx=pad_x, pady=pad_y)
 
-    make_combo = ttk.Combobox(window, textvariable=make_var)
+    make_combo = ttk.Combobox(window, textvariable=make_var, state='readonly')
     make_combo['values'] = list(car_dict.keys())
     make_combo.grid(row=0, column=1, sticky=tk.W+tk.E, padx=pad_x, pady=pad_y)
+
 
     # Create the model dropdown
     model_label = ttk.Label(window, text="Model:")
     model_label.grid(row=1, column=0, sticky=tk.W, padx=pad_x, pady=pad_y)
 
-    model_combo = ttk.Combobox(window, textvariable=model_var)
+    model_combo = ttk.Combobox(window, textvariable=model_var, state='readonly')
     model_combo.grid(row=1, column=1, sticky=tk.W+tk.E, padx=pad_x, pady=pad_y)
 
     def update_models(event):
         selected_make = make_var.get()
-        if selected_make in car_dict:
-            models = car_dict[selected_make]
-            model_combo['values'] = models
-            model_var.set('')  # Clear the selected models option
-        else:
+
+        if selected_make not in car_dict:
             model_combo['values'] = ()
+        else:
+            models = car_dict[selected_make].keys()
+            model_combo['values'] = list(models)
+            model_var.set('')  # Clear the selected models option
+            year_combo['values'] = () # reset years
+
+
+                    
+    def update_years(event):
+        selected_make = make_var.get()
+        selected_model = model_var.get()
+
+        if selected_make in car_dict and selected_model in car_dict[selected_make]:
+            years = car_dict[selected_make][selected_model]
+            # years is taken from the website as a string "1990, 1991, 1992, " etc. this splits it into a list
+            years = years[0].split(', ')
+            year_combo['values'] = years  # Unpack the years list
+            year_var.set('')  # Clear the selected years option
+        else:
+            year_combo['values'] = ()
+
+
 
     make_combo.bind("<<ComboboxSelected>>", update_models)
-
+    model_combo.bind("<<ComboboxSelected>>", update_years)
     # Create the year dropdown
     year_label = ttk.Label(window, text="Year:")
     year_label.grid(row=2, column=0, sticky=tk.W, padx=pad_x, pady=pad_y)
 
-    year_combo = ttk.Combobox(window, textvariable=year_var)
-    year_combo['values'] = ('Test Year 1', 'Test Year 2', 'Test Year 3')
+    year_combo = ttk.Combobox(window, textvariable=year_var, state='readonly')
+    year_combo['values'] = ('')
     year_combo.grid(row=2, column=1, sticky=tk.W+tk.E, padx=pad_x, pady=pad_y)
 
     # Create the sort dropdown
     sort_label = ttk.Label(window, text="Sort:")
     sort_label.grid(row=3, column=0, sticky=tk.W, padx=pad_x, pady=pad_y)
 
-    sort_combo = ttk.Combobox(window, textvariable=sort_var)
-    sort_combo['values'] = ('Test Sort 1', 'Test Sort 2', 'Test Sort 3')
+    sort_combo = ttk.Combobox(window, textvariable=sort_var, state='readonly')
+    sort_combo['values'] = ('Price', 'Mileage', 'Year')
     sort_combo.grid(row=3, column=1, sticky=tk.W+tk.E, padx=pad_x, pady=pad_y)
 
     # Create the button to get selected values
