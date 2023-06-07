@@ -7,7 +7,6 @@ import sys
 import json
 import os
 
-
 import requests
 from bs4 import BeautifulSoup
 
@@ -16,17 +15,15 @@ import pandas as pd
 #bs4
 #pandas
 
-test = False
 
 file_path = 'data.json'
-
 
 make = ""
 model = ""
 year = ""
 zip_code = ""
 car_dict = {}
-
+    
 def save_dict_to_json():
     with open(file_path, 'w') as file:
         json.dump(car_dict, file)
@@ -41,7 +38,7 @@ def load_dict_from_json():
             car_dict = json.load(file)
             print(car_dict)
 
-
+# get data from GUI and search for cars
 def search(make_var, model_var, year_var, zip_code_):
     make = make_var.get()
     model = model_var.get()
@@ -55,6 +52,7 @@ def search(make_var, model_var, year_var, zip_code_):
     print("zip_code:", zip_code)
     
     search_autotempest(make, model, year, zip_code)
+    #search_fb_marketplace(make, model, year, zip_code)  #NOT WORKING YET
     
 def search_autotempest(make, model, year, zip_code = "90210"):
     #clean variables for link. 
@@ -67,22 +65,35 @@ def search_autotempest(make, model, year, zip_code = "90210"):
     #example link
     #https://www.autotempest.com/results?make=toyota&model=mr2spyder&zip=39211&localization=any&domesticonly=0
     
-    test_url = ("https://www.autotempest.com/results?make="+ make +
+    url = ("https://www.autotempest.com/results?make="+ make +
                 "&model="+model+ 
                 "&zip="+str(zip_code) +
                 "&localization=any&domesticonly=0")
     if year != "":
-        test_url += "&minyear=" + year+ "&maxyear=" + year
+        url += "&minyear=" + year+ "&maxyear=" + year
 
-    webbrowser.open(test_url, new=0, autoraise=True)
+    webbrowser.open(url, new=0, autoraise=True)
+    
+def search_fb_marketplace(make, model, year, zip_code = "90210"):
+    #clean variables for link. 
+    make = make.replace(" ", "-")
+    make = make.lower()
+    
+    model = model.replace(" ", "-")
+    model = model.lower()
+
+    
+    #example link
+    #https://www.facebook.com/marketplace/category/acura-legend
+    
+    url = ("https://www.facebook.com/marketplace/category/"+ make + "-" + model)
+    
+    webbrowser.open(url, new=0, autoraise=True)
     
 def get_makes_and_models():
     global car_dict
-   
-    global test
+
     car_makes_first_letter = "ABCDEFGHIJKLMNOPRSTV"
-    if test:
-        car_makes_first_letter = "A"
         
     for page in car_makes_first_letter:
         url = "https://www.kbb.com/car-make-model-list/used/"+page+"/make/"
@@ -133,7 +144,6 @@ def get_makes_and_models():
                     car_dict[make][model].append(year)
                 
     save_dict_to_json()
-     
     
 def create_window():
     pad_x = 10
@@ -257,7 +267,6 @@ def create_window():
     # Start the main event loop
     window.mainloop()
 
-
 def main():
     
     load_dict_from_json()
@@ -265,4 +274,3 @@ def main():
     
 if __name__ == '__main__':
     main()
-
