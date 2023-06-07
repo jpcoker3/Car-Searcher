@@ -4,6 +4,8 @@ from tkinter import ttk
 import webbrowser
 import string
 import sys
+import json
+import os
 
 
 import requests
@@ -16,43 +18,7 @@ import pandas as pd
 
 test = False
 
-filename = "test2_car_data.xlsx"
-
-def store_car_data_to_excel():
-    global car_dict
-    
-    df = pd.DataFrame.from_dict(car_dict, orient='index')
-    df.to_excel(filename, index=True)
-    print("Car data stored to Excel successfully.")
-
-def read_car_data_from_excel(nested=False):
-    global car_dict
-    
-    try:
-        df = pd.read_excel(filename, index_col=0)
-        car_dict = df.to_dict(orient='index')
-        print("Car data read from Excel successfully.")
-        for make in car_dict.keys():
-            print(make)
-            for model in car_dict[make].keys():
-                print("\t", model)
-                year = car_dict[make][model]
-                print("\t\t", year)
-        return
-    
-    except FileNotFoundError:
-        if nested:
-            print("Error: Excel file not found and could not be created.")
-            print("Exiting program.")
-            sys.exit("Could not create Car Data File")
-
-        else:
-            print("Excel file not found.")
-            print("Getting makes and models from KBB.")
-            get_makes_and_models()
-            store_car_data_to_excel()
-            
-            read_car_data_from_excel(True)
+file_path = 'data.json'
 
 
 make = ""
@@ -60,6 +26,20 @@ model = ""
 year = ""
 zip_code = ""
 car_dict = {}
+
+def save_dict_to_json():
+    with open(file_path, 'w') as file:
+        json.dump(car_dict, file)
+        print(car_dict)
+
+def load_dict_from_json():
+    if not os.path.exists(file_path):
+        get_makes_and_models() # if no file esists, create it
+    else:
+        global car_dict
+        with open(file_path, 'r') as file:
+            car_dict = json.load(file)
+            print(car_dict)
 
 
 def search(make_var, model_var, year_var, zip_code_):
@@ -91,6 +71,8 @@ def search_autotempest(make, model, year, zip_code = "90210"):
                 "&model="+model+ 
                 "&zip="+str(zip_code) +
                 "&localization=any&domesticonly=0")
+    if year != "":
+        test_url += "&minyear=" + year+ "&maxyear=" + year
 
     webbrowser.open(test_url, new=0, autoraise=True)
     
@@ -150,7 +132,7 @@ def get_makes_and_models():
                 
                     car_dict[make][model].append(year)
                 
-    print(car_dict)
+    save_dict_to_json()
      
     
 def create_window():
@@ -176,7 +158,7 @@ def create_window():
     zip_code_var = tk.StringVar()
 
     # Create the make dropdown
-    make_label = ttk.Label(window, text="Make:")
+    make_label = ttk.Label(window, text="Make: *")
     make_label.grid(row=0, column=0, sticky=tk.W, padx=pad_x, pady=pad_y)
 
     make_combo = ttk.Combobox(window, textvariable=make_var, state='readonly')
@@ -185,7 +167,7 @@ def create_window():
 
 
     # Create the model dropdown
-    model_label = ttk.Label(window, text="Model:")
+    model_label = ttk.Label(window, text="Model: *")
     model_label.grid(row=1, column=0, sticky=tk.W, padx=pad_x, pady=pad_y)
 
     model_combo = ttk.Combobox(window, textvariable=model_var, state='readonly')
@@ -257,7 +239,7 @@ def create_window():
 
     # Validate the option selection to enable/disable the button
     def validate_options(*args):
-        if make_var.get() and model_var.get() and year_var.get() and zip_code_var.get():
+        if make_var.get() and model_var.get():
             button['state'] = 'normal'
         else:
             button['state'] = 'disabled'
@@ -278,8 +260,7 @@ def create_window():
 
 def main():
     
-    #read_car_data_from_excel()
-    get_makes_and_models()
+    load_dict_from_json()
     create_window()
     
 if __name__ == '__main__':
